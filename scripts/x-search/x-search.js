@@ -116,8 +116,9 @@ Filtering:
     );
   }
 
-  if (!Number.isFinite(args.max) || args.max < 1 || args.max > 100) {
-    die(`Invalid --max: ${args.max} (must be 1..100)`);
+  // Twitter recent search: max_results must be between 10 and 100.
+  if (!Number.isFinite(args.max) || args.max < 10 || args.max > 100) {
+    die(`Invalid --max: ${args.max} (must be 10..100 for Twitter/X recent search)`);
   }
 
   return { ...args, list, sinceMs: ms };
