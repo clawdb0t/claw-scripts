@@ -17,7 +17,7 @@ function die(msg, code = 1) {
 }
 
 function parseDurationToMs(s) {
-  // supports: 30m, 1h, 24h, 2d
+  // supports: 30m, 1h, 24h, 2d, 7d
   const m = String(s || '').trim().match(/^([0-9]+)\s*([mhd])$/i);
   if (!m) return null;
   const n = Number(m[1]);
@@ -30,6 +30,10 @@ function parseDurationToMs(s) {
 }
 
 function parseArgs(argv) {
+  // Twitter/X API v2 recent search only supports a limited time window (commonly up to ~7 days).
+  // Enforce this client-side to avoid unnecessary API calls.
+  const MAX_RECENT_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
+
   const args = {
     keyword: [],
     keywords: null,
@@ -98,6 +102,13 @@ Auth:
 
   const ms = parseDurationToMs(args.since);
   if (!ms) die(`Invalid --since duration: ${args.since} (expected e.g. 24h, 1h, 30m, 2d)`);
+
+  if (ms > MAX_RECENT_WINDOW_MS) {
+    die(
+      `Invalid --since: ${args.since}. Twitter/X recent search only supports up to 7d. ` +
+        `Use --since 7d (or less) or switch to a different endpoint/plan for longer timeframes.`
+    );
+  }
 
   if (!Number.isFinite(args.max) || args.max < 1 || args.max > 100) {
     die(`Invalid --max: ${args.max} (must be 1..100)`);
