@@ -43,6 +43,7 @@ function parseArgs(argv) {
     includeRetweets: false,
     excludeFrom: [],
     json: false,
+    aiJson: false,
     tokenRef: 'op://OpenClaw/X.com/Bearer Token',
   };
 
@@ -60,6 +61,7 @@ function parseArgs(argv) {
     else if (a === '--lang') args.lang = next();
     else if (a === '--include-retweets') args.includeRetweets = true;
     else if (a === '--exclude-from') args.excludeFrom = String(next()).split(',').map(s => s.trim()).filter(Boolean);
+    else if (a === '--ai-json') args.aiJson = true;
     else if (a === '--json') args.json = true;
     else if (a === '--token-ref') args.tokenRef = next();
     else if (a === '--help' || a === '-h') {
@@ -244,6 +246,46 @@ async function main() {
     const q = buildQuery(keyword, { includeRetweets: args.includeRetweets, lang: args.lang, excludeFrom: args.excludeFrom });
     const result = await twitterRecentSearch({ bearer, query: q, max: args.max, startTimeIso });
     out.results[keyword] = { query: q, ...result };
+  }
+
+  if (args.aiJson) {
+    const items = [];
+    for (const [keyword, r] of Object.entries(out.results)) {
+      for (const t of r.tweets) {
+        items.push({
+          keyword,
+          query: r.query,
+          tweet: {
+            id: t.id,
+            url: t.url,
+            created_at: t.created_at,
+            author: t.author?.username ? `@${t.author.username}` : null,
+            text: t.text,
+            metrics: {
+              impressions: t.public_metrics?.impression_count ?? null,
+              replies: t.public_metrics?.reply_count ?? null,
+              likes: t.public_metrics?.like_count ?? null,
+              retweets: t.public_metrics?.retweet_count ?? null,
+              quotes: t.public_metrics?.quote_count ?? null,
+              bookmarks: t.public_metrics?.bookmark_count ?? null
+            }
+          }
+        });
+      }
+    }
+
+    process.stdout.write(JSON.stringify({
+      generated_at: out.generated_at,
+      since: out.since,
+      start_time: out.start_time,
+      max: out.max,
+      lang: out.lang,
+      include_retweets: out.include_retweets,
+      exclude_from: out.exclude_from,
+      items
+    }, null, 2));
+    process.stdout.write('\n');
+    return;
   }
 
   if (args.json) {
