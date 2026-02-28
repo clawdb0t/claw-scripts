@@ -41,6 +41,7 @@ function parseArgs(argv) {
     max: 20,
     lang: null,
     includeRetweets: false,
+    excludeFrom: [],
     json: false,
     tokenRef: 'op://OpenClaw/X.com/Bearer Token',
   };
@@ -58,6 +59,7 @@ function parseArgs(argv) {
     else if (a === '--max') args.max = Number(next());
     else if (a === '--lang') args.lang = next();
     else if (a === '--include-retweets') args.includeRetweets = true;
+    else if (a === '--exclude-from') args.excludeFrom = String(next()).split(',').map(s => s.trim()).filter(Boolean);
     else if (a === '--json') args.json = true;
     else if (a === '--token-ref') args.tokenRef = next();
     else if (a === '--help' || a === '-h') {
@@ -70,13 +72,17 @@ Options:
       --since <dur>         Timeframe: 30m | 1h | 24h | 2d (default: 24h)
       --max <n>             Max results per keyword (1..100, default: 20)
       --lang <code>         Filter by tweet language (e.g. de, en)
-      --include-retweets    Include retweets (default: exclude)
-      --json                Output JSON instead of markdown
-      --token-ref <op://..> 1Password reference (default: op://OpenClaw/X.com/Bearer Token)
+      --include-retweets      Include retweets (default: exclude)
+      --exclude-from <a,b,c>  Exclude tweets authored by these usernames (uses -from:username)
+      --json                  Output JSON instead of markdown
+      --token-ref <op://..>   1Password reference (default: op://OpenClaw/X.com/Bearer Token)
 
 Auth:
   - If TWITTER_BEARER_TOKEN is set, it will be used.
   - Otherwise, the script runs: op read "<token-ref>".
+
+Filtering:
+  - --exclude-from adds -from:<username> terms to the query.
 `);
       process.exit(0);
     } else {
@@ -134,10 +140,14 @@ function getBearerToken(tokenRef) {
   }
 }
 
-function buildQuery(keyword, { includeRetweets, lang }) {
+function buildQuery(keyword, { includeRetweets, lang, excludeFrom }) {
   let q = keyword;
   if (!includeRetweets) q = `(${q}) -is:retweet`;
   if (lang) q = `(${q}) lang:${lang}`;
+  if (excludeFrom?.length) {
+    const terms = excludeFrom.map((u) => `-from:${u}`).join(' ');
+    q = `(${q}) ${terms}`;
+  }
   return q;
 }
 
@@ -225,11 +235,12 @@ async function main() {
     max: args.max,
     lang: args.lang,
     include_retweets: args.includeRetweets,
+    exclude_from: args.excludeFrom,
     results: {},
   };
 
   for (const keyword of args.list) {
-    const q = buildQuery(keyword, { includeRetweets: args.includeRetweets, lang: args.lang });
+    const q = buildQuery(keyword, { includeRetweets: args.includeRetweets, lang: args.lang, excludeFrom: args.excludeFrom });
     const result = await twitterRecentSearch({ bearer, query: q, max: args.max, startTimeIso });
     out.results[keyword] = { query: q, ...result };
   }
@@ -246,6 +257,7 @@ async function main() {
   md.push(`- max per keyword: ${args.max}`);
   md.push(`- lang: ${args.lang || 'any'}`);
   md.push(`- retweets: ${args.includeRetweets ? 'included' : 'excluded'}`);
+  md.push(`- exclude from: ${args.excludeFrom.length ? args.excludeFrom.join(', ') : 'none'}`);
 
   for (const keyword of args.list) {
     md.push(toMarkdown(keyword, out.results[keyword], args));
