@@ -6,3 +6,6 @@ Principles:
 - deterministic scripts (no hidden marketplace skills)
 - secrets pulled at runtime (e.g. via 1Password `op read`)
 - produce concise, auditable output
+
+Structure:
+- `scripts/<name>/` one folder per script/tool
